@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Activity, ArrowLeft, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
+import { Activity, ArrowLeft, CircleHelp, KeyRound, Loader2, LockKeyhole, Mail } from "lucide-react";
 import { useCrmStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,6 +19,7 @@ export function LoginView() {
   const [password2, setPassword2] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ayuda, setAyuda] = useState(false);
 
   async function onLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -163,6 +164,43 @@ export function LoginView() {
                 >
                   Olvidé mi contraseña
                 </button>
+                <div className="border-t border-border/60 pt-3">
+                  <button
+                    type="button"
+                    aria-expanded={ayuda}
+                    className="flex w-full items-center justify-center gap-1 text-xs text-muted-foreground transition-colors hover:text-teal-300"
+                    onClick={() => setAyuda((v) => !v)}
+                  >
+                    <CircleHelp className="size-3" aria-hidden /> ¿No puedes entrar?
+                  </button>
+                  {ayuda && (
+                    <div className="mt-3 space-y-2 rounded-md border border-border/70 bg-muted/30 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                      <p>
+                        <span className="font-semibold text-foreground">Importante:</span> el usuario de supabase.com
+                        (con el que abres el panel) <span className="text-foreground">no</span> sirve para entrar al CRM.
+                        El CRM usa su propia lista de usuarios:
+                      </p>
+                      <ol className="list-decimal space-y-1 pl-4">
+                        <li>
+                          En tu panel de Supabase abre <span className="text-foreground">Authentication → Users → Add user</span>.
+                        </li>
+                        <li>Elige “Create new user”, escribe tu correo y una contraseña (mínimo 6 caracteres).</li>
+                        <li>
+                          Marca <span className="text-foreground">“Auto Confirm User”</span> y guarda. Luego entra al CRM con esos
+                          datos.
+                        </li>
+                      </ol>
+                      <p>
+                        Si tu cuenta ya existe pero dice que no está confirmada: en Authentication → Users selecciona tu
+                        usuario y pulsa <span className="text-foreground">“Confirm user”</span>.
+                      </p>
+                      <p>
+                        Si olvidaste la contraseña, usa “Olvidé mi contraseña”, o elimina y vuelve a crear el usuario desde el
+                        panel (los datos de los pacientes no se pierden).
+                      </p>
+                    </div>
+                  )}
+                </div>
               </form>
             )}
 
