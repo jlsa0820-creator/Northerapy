@@ -2,7 +2,7 @@
 
 import * as XLSX from "xlsx";
 import { Asistencia, Ingreso, Paciente } from "./types";
-import { deudaDePaciente, fmtFecha, totalDeIngreso } from "./business";
+import { deudaDePaciente, diasLaboralesSinAsistir, fmtFecha, frecSemanal, pctAdherencia, totalDeIngreso } from "./business";
 
 function descargar(rows: Record<string, unknown>[], nombre: string) {
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -47,9 +47,13 @@ export function exportarPacientes(
       "Sesiones programadas": p.sesiones_programadas ?? "",
       "Sesiones totales": p.sesiones_totales,
       "Última asistencia": a?.ultima_asistencia ? fmtFecha(a.ultima_asistencia) : "",
-      "Adherencia %": a?.pct_adherencia ?? "",
-      "Días sin asistir": a?.dias_sin_asistir ?? "",
-      "Frec. semanal": a?.frec_semanal ?? "",
+      "Adherencia %":
+        pctAdherencia(
+          Math.max(p.sesiones_totales ?? 0, a?.ses_totales ?? 0),
+          p.sesiones_programadas ?? a?.ses_programadas ?? null
+        ) ?? "",
+      "Días sin asistir": diasLaboralesSinAsistir(a?.ultima_asistencia) ?? "",
+      "Frec. semanal": ing.length ? frecSemanal(ing) : (a?.frec_semanal ?? ""),
       "Deuda (S/)": deudaDePaciente(ing),
       "Status": p.status ?? "",
     };

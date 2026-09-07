@@ -350,7 +350,7 @@ export function IngresosView({ irA }: Props) {
                   <div className="space-y-1.5">
                     <Label className="text-xs uppercase tracking-wider text-muted-foreground">{l.titulo} — estado</Label>
                     <Select
-                      value={ed[`${l.clave}_estado`]}
+                      value={ed[`${l.clave}_estado`] ?? undefined}
                       onValueChange={(v) => setEd({ ...ed, [`${l.clave}_estado`]: v })}
                     >
                       <SelectTrigger className="w-full" aria-label={`Estado de ${l.titulo}`}>

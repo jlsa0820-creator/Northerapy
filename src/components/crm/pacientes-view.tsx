@@ -5,9 +5,11 @@ import { useCrmStore } from "@/lib/store";
 import {
   calcularEstado,
   deudaDePaciente,
+  diasLaboralesSinAsistir,
   edadLegible,
   fmtFecha,
   paqueteInfo,
+  pctAdherencia,
   plural,
   soles,
   totalDeIngreso,
@@ -352,6 +354,11 @@ export function PacientesView({ irA }: Props) {
             const estado = calcularEstado({ paciente: detalle, asistencia: a ?? null, ingresos: ing });
             const deuda = deudaDePaciente(ing);
             const paq = paqueteInfo(ing);
+            // Valores siempre frescos (calculados, no almacenados): la misma fórmula que la BD
+            const sesionesDet = Math.max(detalle.sesiones_totales ?? 0, a?.ses_totales ?? 0);
+            const programadasDet = detalle.sesiones_programadas ?? a?.ses_programadas ?? null;
+            const pctDet = pctAdherencia(sesionesDet, programadasDet);
+            const diasDet = diasLaboralesSinAsistir(a?.ultima_asistencia);
             return (
               <>
                 <DialogHeader>
@@ -376,11 +383,11 @@ export function PacientesView({ irA }: Props) {
                     <Info etiqueta="Primera sesión" valor={fmtFecha(detalle.primera_sesion)} />
                     <Info etiqueta="Sesiones" valor={`${detalle.sesiones_totales}${detalle.sesiones_programadas ? ` de ${detalle.sesiones_programadas} programadas` : ""}`} />
                     <Info etiqueta="Última asistencia" valor={a?.ultima_asistencia ? fmtFecha(a.ultima_asistencia) : "—"} />
-                    {a?.pct_adherencia != null && (
-                      <Info etiqueta="Adherencia" valor={`${a.pct_adherencia}%`} />
+                    {pctDet != null && (
+                      <Info etiqueta="Adherencia" valor={`${pctDet}%`} />
                     )}
-                    {a?.dias_sin_asistir != null && (
-                      <Info etiqueta="Días sin asistir" valor={plural(a.dias_sin_asistir, "día laboral", "días laborales")} />
+                    {diasDet != null && (
+                      <Info etiqueta="Días sin asistir" valor={plural(diasDet, "día laboral", "días laborales")} />
                     )}
                   </div>
 

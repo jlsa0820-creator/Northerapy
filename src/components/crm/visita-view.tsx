@@ -415,7 +415,7 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
                   <button
                     key={op.id}
                     type="button"
-                    onClick={() => setTarifa(op.id)}
+                    onClick={() => setTarifaElegida(op.id)}
                     className={cn(
                       "rounded-lg border px-3 py-2.5 text-left transition-colors",
                       tarifa === op.id ? "border-teal-500/50 bg-teal-500/10" : "border-border/70 hover:border-border"
@@ -426,7 +426,7 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
                   </button>
                 ))}
                 <div className={cn("rounded-lg border px-3 py-2 transition-colors", tarifa === "otro" ? "border-teal-500/50 bg-teal-500/10" : "border-border/70")}>
-                  <button type="button" className="block w-full text-left text-sm font-semibold" onClick={() => setTarifa("otro")}>
+                  <button type="button" className="block w-full text-left text-sm font-semibold" onClick={() => setTarifaElegida("otro")}>
                     Otro monto
                   </button>
                   <Input
@@ -438,12 +438,17 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
                     className="mt-1 h-7 border-border/70 text-xs"
                     value={tarifaOtro}
                     onChange={(e) => {
-                      setTarifa("otro");
+                      setTarifaElegida("otro");
                       setTarifaOtro(e.target.value);
                     }}
                   />
                 </div>
               </div>
+              {tarifa === "cubierta" && !paquete?.activo && (
+                <p className="text-xs text-amber-400">
+                  Este paciente no tiene paquete activo: la sesión quedará en S/ 0. Revisa que sea correcto.
+                </p>
+              )}
             </div>
 
             {/* Extras */}

@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { GRUPOS_EDAD_SUGERIDOS, OPCIONES_CONOCIO, OPCIONES_SEXO } from "@/lib/types";
+import { GRUPOS_EDAD_SUGERIDOS, OPCIONES_CONOCIO, OPCIONES_SEXO, grupoEdadDeValor } from "@/lib/types";
 import { hoyISO } from "@/lib/business";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -72,13 +72,10 @@ export type DatosGuardado = {
 };
 
 export function grupoEdadSugerido(edad: number, unidad: "años" | "meses"): string {
-  const anios = unidad === "meses" ? edad / 12 : edad;
-  if (anios < 3) return "Bebés: 0 a 2";
-  if (anios < 12) return "Niños: 3 a 11";
-  if (anios < 18) return "Adolescentes: 12 a 17";
-  if (anios < 30) return "Adultos: 18 a 29";
-  if (anios < 60) return "Adultos: 30 a 59";
-  return "Adultos mayores: 60 a más";
+  // Misma fórmula centralizada que usará la base de datos (types.ts → SQL nor_grupo_edad)
+  return (
+    grupoEdadDeValor(edad, unidad) ?? ""
+  );
 }
 
 interface Props {

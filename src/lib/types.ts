@@ -95,11 +95,26 @@ export const OPCIONES_CONOCIO = [
 export const GRUPOS_EDAD_SUGERIDOS = [
   "Bebés: 0 a 2",
   "Niños: 3 a 11",
-  "Adolescentes: 12 a 17",
-  "Adultos: 18 a 29",
+  "Adolescente: 12 a 17",
+  "Joven: 18 a 29",
   "Adultos: 30 a 59",
   "Adultos mayores: 60 a más",
 ];
+
+/** Deriva el grupo de edad a partir del valor y la unidad (misma fórmula que la base de datos) */
+export function grupoEdadDeValor(
+  edadValor: number | null | undefined,
+  unidad?: string | null
+): string | null {
+  if (edadValor == null) return null;
+  if ((unidad ?? "años") === "meses") return "Bebés: 0 a 2";
+  if (edadValor < 3) return "Bebés: 0 a 2";
+  if (edadValor < 12) return "Niños: 3 a 11";
+  if (edadValor < 18) return "Adolescente: 12 a 17";
+  if (edadValor < 30) return "Joven: 18 a 29";
+  if (edadValor < 60) return "Adultos: 30 a 59";
+  return "Adultos mayores: 60 a más";
+}
 
 export const OPCIONES_SEXO = ["Femenino", "Masculino", "Otro"] as const;
 

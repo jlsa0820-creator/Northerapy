@@ -1,0 +1,663 @@
+     1→"use client";
+     2→
+     3→import { useMemo, useState } from "react";
+     4→import { useCrmStore } from "@/lib/store";
+     5→import {
+     6→  PAQUETE_PRECIO,
+     7→  PRECIO_DICLOFENACO,
+     8→  TARIFAS,
+     9→  EstadoLinea,
+    10→  METODOS_PAGO,
+    11→  TarifaMode,
+    12→} from "@/lib/types";
+    13→import {
+    14→  calcularEstado,
+    15→  deudaDePaciente,
+    16→  diasLaboralesSinAsistir,
+    17→  esFechaFutura,
+    18→  esFinDeSemana,
+    19→  fmtFecha,
+    20→  hoyISO,
+    21→  paqueteInfo,
+    22→  plural,
+    23→  soles,
+    24→} from "@/lib/business";
+    25→import { StatusBadge } from "./badges";
+    26→import { useToast } from "@/hooks/use-toast";
+    27→import { Button } from "@/components/ui/button";
+    28→import { Card, CardContent } from "@/components/ui/card";
+    29→import { Input } from "@/components/ui/input";
+    30→import { Label } from "@/components/ui/label";
+    31→import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+    32→import {
+    33→  Select,
+    34→  SelectContent,
+    35→  SelectItem,
+    36→  SelectTrigger,
+    37→  SelectValue,
+    38→} from "@/components/ui/select";
+    39→import {
+    40→  Dialog,
+    41→  DialogContent,
+    42→  DialogDescription,
+    43→  DialogFooter,
+    44→  DialogHeader,
+    45→  DialogTitle,
+    46→} from "@/components/ui/dialog";
+    47→import { CalendarPlus, CheckCircle2, Loader2, Search, Wallet } from "lucide-react";
+    48→import { cn } from "@/lib/utils";
+    49→
+    50→interface Props {
+    51→  pacienteInicial: number | null;
+    52→  onPacienteUsado: () => void;
+    53→}
+    54→
+    55→export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
+    56→  const { pacientes, asistencias, ingresos, registrarVisita } = useCrmStore();
+    57→  const { toast } = useToast();
+    58→
+    59→  // Paciente efectivo: el preseleccionado (p. ej. desde «Pacientes») o el elegido localmente
+    60→  const [idLocal, setIdLocal] = useState<number | null>(null);
+    61→  const pacienteId = pacienteInicial ?? idLocal;
+    62→
+    63→  // Búsqueda
+    64→  const [query, setQuery] = useState("");
+    65→  const [menuAbierto, setMenuAbierto] = useState(false);
+    66→  const [indiceActivo, setIndiceActivo] = useState(0);
+    67→
+    68→  // Formulario
+    69→  const [fecha, setFecha] = useState(hoyISO());
+    70→  const [zonas, setZonas] = useState(1);
+    71→  // Tarifa efectiva: la elegida por el usuario o la derivada del paquete activo
+    72→  const [tarifaElegida, setTarifaElegida] = useState<TarifaMode | null>(null);
+    73→  const [tarifaOtro, setTarifaOtro] = useState("");
+    74→  const [dicloCant, setDicloCant] = useState(0);
+    75→  const [ortoMonto, setOrtoMonto] = useState("");
+    76→  const [venderPaquete, setVenderPaquete] = useState(false);
+    77→  const [guardando, setGuardando] = useState(false);
+    78→  const [cobrando, setCobrando] = useState(false);
+    79→  const [metodoGlobal, setMetodoGlobal] = useState<EstadoLinea>("efectivo");
+    80→  const [metodoLineas, setMetodoLineas] = useState({ terapia: "efectivo", extras: "efectivo" });
+    81→  const [exito, setExito] = useState<string | null>(null);
+    82→
+    83→  const paciente = useMemo(
+    84→    () => pacientes.find((p) => p.paciente_id === pacienteId) ?? null,
+    85→    [pacientes, pacienteId]
+    86→  );
+    87→  const ingresosPaciente = useMemo(
+    88→    () => ingresos.filter((i) => i.paciente_id === pacienteId),
+    89→    [ingresos, pacienteId]
+    90→  );
+    91→  const asistencia = useMemo(
+    92→    () => asistencias.find((a) => a.paciente_id === pacienteId) ?? null,
+    93→    [asistencias, pacienteId]
+    94→  );
+    95→  const estado = useMemo(
+    96→    () => (paciente ? calcularEstado({ paciente, asistencia, ingresos: ingresosPaciente }) : null),
+    97→    [paciente, asistencia, ingresosPaciente]
+    98→  );
+    99→  const deuda = useMemo(() => deudaDePaciente(ingresosPaciente), [ingresosPaciente]);
+   100→  const paquete = useMemo(() => paqueteInfo(ingresosPaciente), [ingresosPaciente]);
+   101→  const tarifa: TarifaMode = tarifaElegida ?? (paquete?.activo ? "cubierta" : "suelta");
+   102→
+   103→  const resultados = useMemo(() => {
+   104→    const q = query.trim().toLowerCase();
+   105→    if (!q) return [];
+   106→    return pacientes
+   107→      .filter((p) => p.nombre_completo.toLowerCase().includes(q))
+   108→      .sort((a, b) => {
+   109→        const ia = a.nombre_completo.toLowerCase().indexOf(q);
+   110→        const ib = b.nombre_completo.toLowerCase().indexOf(q);
+   111→        if (ia !== ib) return ia - ib;
+   112→        return a.nombre_completo.localeCompare(b.nombre_completo, "es");
+   113→      })
+   114→      .slice(0, 8);
+   115→  }, [pacientes, query]);
+   116→
+   117→  // Índice activo recortado al tamaño de resultados actuales
+   118→  const indiceSeguro = Math.min(indiceActivo, Math.max(0, resultados.length - 1));
+   119→
+   120→  const precioZona = tarifa === "otro" ? Number(tarifaOtro || 0) : TARIFAS[tarifa as keyof typeof TARIFAS];
+   121→  const montoTerapia = Number.isFinite(precioZona) ? precioZona * zonas : 0;
+   122→  const montoDiclo = dicloCant * PRECIO_DICLOFENACO;
+   123→  const montoOrto = Number(ortoMonto || 0) || 0;
+   124→  const totalVisita = montoTerapia + montoDiclo + montoOrto;
+   125→  const totalConPaquete = totalVisita + (venderPaquete ? PAQUETE_PRECIO : 0);
+   126→
+   127→  const finDeSemanaWarn = fecha && esFinDeSemana(fecha) && fecha === hoyISO();
+   128→  const fechaMala = fecha && esFechaFutura(fecha);
+   129→
+   130→  function seleccionarPaciente(id: number) {
+   131→    setIdLocal(id);
+   132→    onPacienteUsado();
+   133→    setQuery("");
+   134→    setMenuAbierto(false);
+   135→    setExito(null);
+   136→    setVenderPaquete(false);
+   137→    setTarifaElegida(null);
+   138→  }
+   139→
+   140→  function onBuscarTeclado(e: React.KeyboardEvent) {
+   141→    if (!menuAbierto || resultados.length === 0) return;
+   142→    if (e.key === "ArrowDown") {
+   143→      e.preventDefault();
+   144→      setIndiceActivo((i) => (i + 1) % resultados.length);
+   145→    } else if (e.key === "ArrowUp") {
+   146→      e.preventDefault();
+   147→      setIndiceActivo((i) => (i - 1 + resultados.length) % resultados.length);
+   148→    } else if (e.key === "Enter") {
+   149→      e.preventDefault();
+   150→      seleccionarPaciente(resultados[indiceSeguro].paciente_id);
+   151→    } else if (e.key === "Escape") {
+   152→      setMenuAbierto(false);
+   153→    }
+   154→  }
+   155→
+   156→  async function guardar(cobrarAhora: boolean) {
+   157→    if (!paciente) return;
+   158→    if (fechaMala) {
+   159→      toast({ title: "Fecha inválida", description: "No puedes registrar visitas con fecha futura.", variant: "destructive" });
+   160→      return;
+   161→    }
+   162→    if (cobrarAhora) {
+   163→      setMetodoLineas({ terapia: metodoGlobal, extras: metodoGlobal });
+   164→      setCobrando(true);
+   165→      return;
+   166→    }
+   167→    await persistir({
+   168→      terapia: { estado: montoTerapia > 0 ? "debe" : "no_aplica", monto: montoTerapia },
+   169→      diclofenaco: { estado: montoDiclo > 0 ? "debe" : "no_aplica", monto: montoDiclo },
+   170→      ortopedico: { estado: montoOrto > 0 ? "debe" : "no_aplica", monto: montoOrto },
+   171→      paquete: venderPaquete ? "debe" : null,
+   172→    });
+   173→  }
+   174→
+   175→  async function confirmarCobro() {
+   176→    await persistir({
+   177→      terapia: {
+   178→        estado: montoTerapia > 0 ? (metodoLineas.terapia as EstadoLinea) : "no_aplica",
+   179→        monto: montoTerapia,
+   180→      },
+   181→      diclofenaco: {
+   182→        estado: montoDiclo > 0 ? (metodoLineas.extras as EstadoLinea) : "no_aplica",
+   183→        monto: montoDiclo,
+   184→      },
+   185→      ortopedico: {
+   186→        estado: montoOrto > 0 ? (metodoLineas.extras as EstadoLinea) : "no_aplica",
+   187→        monto: montoOrto,
+   188→      },
+   189→      paquete: venderPaquete ? (metodoLineas.terapia as EstadoLinea) : null,
+   190→    });
+   191→    setCobrando(false);
+   192→  }
+   193→
+   194→  async function persistir(m: {
+   195→    terapia: { estado: EstadoLinea; monto: number };
+   196→    diclofenaco: { estado: EstadoLinea; monto: number };
+   197→    ortopedico: { estado: EstadoLinea; monto: number };
+   198→    paquete: EstadoLinea | null;
+   199→  }) {
+   200→    if (!paciente) return;
+   201→    setGuardando(true);
+   202→    const res = await registrarVisita({
+   203→      pacienteId: paciente.paciente_id,
+   204→      fecha,
+   205→      zonas,
+   206→      terapia: m.terapia,
+   207→      diclofenaco: m.diclofenaco,
+   208→      ortopedico: m.ortopedico,
+   209→      venderPaquete: m.paquete ? { estado: m.paquete } : null,
+   210→    });
+   211→    setGuardando(false);
+   212→    if (res.ok) {
+   213→      const texto = m.paquete === null && !m.terapia.monto && !m.diclofenaco.monto && !m.ortopedico.monto
+   214→        ? "Visita registrada (sin cargos)"
+   215→        : m.terapia.estado === "debe" && (m.terapia.monto > 0 || m.diclofenaco.monto > 0 || m.ortopedico.monto > 0)
+   216→          ? "Visita registrada. El monto quedó como deuda (estado «debe»)."
+   217→          : "Visita y cobro registrados ✓";
+   218→      setExito(texto);
+   219→      toast({ title: "Guardado en Supabase ✓", description: texto });
+   220→      // Reset de la visita (mantiene el paciente para agilizar)
+   221→      setDicloCant(0);
+   222→      setOrtoMonto("");
+   223→      setVenderPaquete(false);
+   224→      setTarifaOtro("");
+   225→    } else {
+   226→      toast({ title: "No se pudo guardar", description: res.error, variant: "destructive" });
+   227→    }
+   228→  }
+   229→
+   230→  return (
+   231→    <div className="mx-auto max-w-3xl space-y-4">
+   232→      <div className="flex items-center gap-3">
+   233→        <div className="flex size-10 items-center justify-center rounded-xl border border-teal-500/30 bg-teal-500/10">
+   234→          <CalendarPlus className="size-5 text-teal-300" aria-hidden />
+   235→        </div>
+   236→        <div>
+   237→          <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Anotar visita y cobro</h1>
+   238→          <p className="text-sm text-muted-foreground">Busca al paciente, anota la terapia y cobra en un solo paso.</p>
+   239→        </div>
+   240→      </div>
+   241→
+   242→      {/* Buscador */}
+   243→      <div className="relative">
+   244→        <div className="relative">
+   245→          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+   246→          <Input
+   247→            placeholder="Escribe el nombre del paciente…"
+   248→            className="h-11 pl-9 text-base"
+   249→            value={query}
+   250→            onChange={(e) => {
+   251→              setQuery(e.target.value);
+   252→              setMenuAbierto(true);
+   253→            }}
+   254→            onFocus={() => setMenuAbierto(true)}
+   255→            onKeyDown={onBuscarTeclado}
+   256→            aria-label="Buscar paciente por nombre"
+   257→            role="combobox"
+   258→            aria-expanded={menuAbierto && resultados.length > 0}
+   259→          />
+   260→        </div>
+   261→        {menuAbierto && query.trim() && (
+   262→          <ul
+   263→            role="listbox"
+   264→            className="absolute inset-x-0 top-full z-30 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-border bg-popover shadow-2xl"
+   265→          >
+   266→            {resultados.length === 0 && (
+   267→              <li className="px-4 py-3 text-sm text-muted-foreground">Sin coincidencias para «{query}».</li>
+   268→            )}
+   269→            {resultados.map((p, i) => {
+   270→              const idx = p.nombre_completo.toLowerCase().indexOf(query.trim().toLowerCase());
+   271→              const nombre = idx >= 0 ? (
+   272→                <>
+   273→                  {p.nombre_completo.slice(0, idx)}
+   274→                  <mark className="rounded bg-teal-500/25 px-0.5 text-teal-200">{p.nombre_completo.slice(idx, idx + query.trim().length)}</mark>
+   275→                  {p.nombre_completo.slice(idx + query.trim().length)}
+   276→                </>
+   277→              ) : p.nombre_completo;
+   278→              return (
+   279→                <li key={p.paciente_id}>
+   280→                  <button
+   281→                    role="option"
+   282→                    aria-selected={i === indiceSeguro}
+   283→                    className={cn(
+   284→                      "flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-sm transition-colors",
+   285→                      i === indiceSeguro ? "bg-accent text-accent-foreground" : "hover:bg-secondary/60"
+   286→                    )}
+   287→                    onMouseEnter={() => setIndiceActivo(i)}
+   288→                    onClick={() => seleccionarPaciente(p.paciente_id)}
+   289→                  >
+   290→                    <span>{nombre}</span>
+   291→                    <span className="text-[11px] text-muted-foreground">ID {p.paciente_id}</span>
+   292→                  </button>
+   293→                </li>
+   294→              );
+   295→            })}
+   296→          </ul>
+   297→        )}
+   298→      </div>
+   299→
+   300→      {/* Ficha del paciente */}
+   301→      {paciente && estado && (
+   302→        <Card className="border-border/70 bg-card/80">
+   303→          <CardContent className="p-4 sm:p-5">
+   304→            <div className="flex flex-wrap items-start justify-between gap-3">
+   305→              <div>
+   306→                <p className="text-base font-bold">{paciente.nombre_completo}</p>
+   307→                <p className="text-xs text-muted-foreground">
+   308→                  {paciente.diagnostico ?? "Sin diagnóstico registrado"}
+   309→                </p>
+   310→              </div>
+   311→              <StatusBadge estado={estado} />
+   312→            </div>
+   313→            <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+   314→              <div>
+   315→                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Sesiones</p>
+   316→                <p className="num-tabular mt-0.5 font-semibold">
+   317→                  {paciente.sesiones_totales}
+   318→                  {paciente.sesiones_programadas ? ` / ${paciente.sesiones_programadas}` : ""}
+   319→                </p>
+   320→              </div>
+   321→              <div>
+   322→                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Última vez</p>
+   323→                <p className="mt-0.5">
+   324→                  {asistencia?.ultima_asistencia ? (
+   325→                    <>
+   326→                      {fmtFecha(asistencia.ultima_asistencia)}
+   327→                      <span className="block text-[11px] text-muted-foreground">
+   328→                        hace {plural(diasLaboralesSinAsistir(asistencia.ultima_asistencia) ?? 0, "día laboral", "días laborales")}
+   329→                      </span>
+   330→                    </>
+   331→                  ) : (
+   332→                    <span className="text-muted-foreground">Primera visita</span>
+   333→                  )}
+   334→                </p>
+   335→              </div>
+   336→              <div>
+   337→                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Deuda</p>
+   338→                <p className={cn("num-tabular mt-0.5 font-semibold", deuda > 0 ? "text-rose-400" : "text-emerald-400")}>
+   339→                  {deuda > 0 ? soles(deuda) : "Al día"}
+   340→                </p>
+   341→              </div>
+   342→              {paquete && (
+   343→                <div>
+   344→                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Paquete</p>
+   345→                  <p className={cn("mt-0.5 font-semibold", paquete.activo ? "text-teal-300" : "text-muted-foreground")}>
+   346→                    {paquete.activo ? `Activo · quedan ${paquete.restantes}` : "Agotado"}
+   347→                  </p>
+   348→                </div>
+   349→              )}
+   350→            </div>
+   351→
+   352→            {paquete?.activo && (
+   353→              <p className="mt-3 rounded-lg border border-teal-500/25 bg-teal-500/8 px-3 py-2 text-xs text-teal-200">
+   354→                Paquete de 5 sesiones activo: le quedan {paquete.restantes} (usadas {paquete.usadas} de 5, comprado el {fmtFecha(paquete.fechaCompra)}). La tarifa «Cubierta por paquete» quedó seleccionada.
+   355→              </p>
+   356→            )}
+   357→          </CardContent>
+   358→        </Card>
+   359→      )}
+   360→
+   361→      {paciente && (
+   362→        <Card className="border-border/70 bg-card/80">
+   363→          <CardContent className="space-y-5 p-4 sm:p-5">
+   364→            {exito && (
+   365→              <p className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5 text-sm font-medium text-emerald-300">
+   366→                <CheckCircle2 className="size-4 shrink-0" aria-hidden /> {exito}
+   367→              </p>
+   368→            )}
+   369→
+   370→            {/* Fecha */}
+   371→            <div className="grid gap-4 sm:grid-cols-2">
+   372→              <div className="space-y-1.5">
+   373→                <Label htmlFor="fecha-visita">Fecha de la visita *</Label>
+   374→                <Input
+   375→                  id="fecha-visita"
+   376→                  type="date"
+   377→                  max={hoyISO()}
+   378→                  value={fecha}
+   379→                  onChange={(e) => setFecha(e.target.value)}
+   380→                  className={cn("w-full sm:w-44", fechaMala && "border-rose-500/60")}
+   381→                />
+   382→                {fechaMala && <p className="text-xs text-rose-400">No se permiten fechas futuras.</p>}
+   383→                {finDeSemanaWarn && <p className="text-xs text-amber-400">Es fin de semana: confirma que la visita fue hoy.</p>}
+   384→              </div>
+   385→              <div className="space-y-1.5">
+   386→                <Label>Zonas a tratar *</Label>
+   387→                <RadioGroup value={String(zonas)} onValueChange={(v) => setZonas(Number(v))} className="flex gap-2">
+   388→                  {[1, 2].map((z) => (
+   389→                    <label
+   390→                      key={z}
+   391→                      className={cn(
+   392→                        "flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg border text-sm font-medium transition-colors",
+   393→                        zonas === z ? "border-teal-500/50 bg-teal-500/10 text-teal-200" : "border-border/70 text-muted-foreground hover:border-border"
+   394→                      )}
+   395→                    >
+   396→                      <RadioGroupItem value={String(z)} id={`zona-${z}`} className="sr-only" />
+   397→                      {plural(z, "zona", "zonas")}
+   398→                    </label>
+   399→                  ))}
+   400→                </RadioGroup>
+   401→              </div>
+   402→            </div>
+   403→
+   404→            {/* Tarifa */}
+   405→            <div className="space-y-1.5">
+   406→              <Label>Tarifa de la terapia</Label>
+   407→              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+   408→                {(
+   409→                  [
+   410→                    { id: "cubierta", titulo: "Cubierta", sub: "S/ 0 · incluida en paquete" },
+   411→                    { id: "paquete", titulo: "Paquete", sub: `S/ ${TARIFAS.paquete} por zona` },
+   412→                    { id: "suelta", titulo: "Suelta", sub: `S/ ${TARIFAS.suelta} por zona` },
+   413→                  ] as { id: TarifaMode; titulo: string; sub: string }[]
+   414→                ).map((op) => (
+   415→                  <button
+   416→                    key={op.id}
+   417→                    type="button"
+   418→                    onClick={() => setTarifa(op.id)}
+   419→                    className={cn(
+   420→                      "rounded-lg border px-3 py-2.5 text-left transition-colors",
+   421→                      tarifa === op.id ? "border-teal-500/50 bg-teal-500/10" : "border-border/70 hover:border-border"
+   422→                    )}
+   423→                  >
+   424→                    <span className={cn("block text-sm font-semibold", tarifa === op.id ? "text-teal-200" : "")}>{op.titulo}</span>
+   425→                    <span className="block text-[11px] text-muted-foreground">{op.sub}</span>
+   426→                  </button>
+   427→                ))}
+   428→                <div className={cn("rounded-lg border px-3 py-2 transition-colors", tarifa === "otro" ? "border-teal-500/50 bg-teal-500/10" : "border-border/70")}>
+   429→                  <button type="button" className="block w-full text-left text-sm font-semibold" onClick={() => setTarifa("otro")}>
+   430→                    Otro monto
+   431→                  </button>
+   432→                  <Input
+   433→                    aria-label="Monto personalizado por zona"
+   434→                    type="number"
+   435→                    min={0}
+   436→                    step="0.5"
+   437→                    placeholder="S/ libre"
+   438→                    className="mt-1 h-7 border-border/70 text-xs"
+   439→                    value={tarifaOtro}
+   440→                    onChange={(e) => {
+   441→                      setTarifa("otro");
+   442→                      setTarifaOtro(e.target.value);
+   443→                    }}
+   444→                  />
+   445→                </div>
+   446→              </div>
+   447→            </div>
+   448→
+   449→            {/* Extras */}
+   450→            <div className="grid gap-4 sm:grid-cols-2">
+   451→              <div className="space-y-1.5">
+   452→                <Label htmlFor="diclo">Diclofenaco (S/ {PRECIO_DICLOFENACO} c/u)</Label>
+   453→                <div className="flex items-center gap-2">
+   454→                  <Button type="button" variant="outline" size="icon" className="size-9" onClick={() => setDicloCant(Math.max(0, dicloCant - 1))} aria-label="Quitar diclofenaco">−</Button>
+   455→                  <Input
+   456→                    id="diclo"
+   457→                    type="number"
+   458→                    min={0}
+   459→                    className="num-tabular w-20 text-center"
+   460→                    value={dicloCant}
+   461→                    onChange={(e) => setDicloCant(Math.max(0, Number(e.target.value || 0)))}
+   462→                  />
+   463→                  <Button type="button" variant="outline" size="icon" className="size-9" onClick={() => setDicloCant(dicloCant + 1)} aria-label="Agregar diclofenaco">+</Button>
+   464→                  <span className="num-tabular text-sm text-muted-foreground">= {soles(montoDiclo)}</span>
+   465→                </div>
+   466→              </div>
+   467→              <div className="space-y-1.5">
+   468→                <Label htmlFor="orto">Ortopédico (monto libre)</Label>
+   469→                <Input
+   470→                  id="orto"
+   471→                  type="number"
+   472→                  min={0}
+   473→                  step="0.5"
+   474→                  placeholder="S/ 0.00"
+   475→                  className="num-tabular w-40"
+   476→                  value={ortoMonto}
+   477→                  onChange={(e) => setOrtoMonto(e.target.value)}
+   478→                />
+   479→              </div>
+   480→            </div>
+   481→
+   482→            {/* Vender paquete */}
+   483→            <div
+   484→              className={cn(
+   485→                "flex items-center justify-between gap-3 rounded-lg border px-3.5 py-3 transition-colors",
+   486→                venderPaquete ? "border-teal-500/40 bg-teal-500/8" : "border-border/70 bg-secondary/30"
+   487→              )}
+   488→            >
+   489→              <div>
+   490→                <p className="text-sm font-semibold">¿Le vendes el paquete de 5 sesiones?</p>
+   491→                <p className="text-[11px] text-muted-foreground">
+   492→                  Cargo único de {soles(PAQUETE_PRECIO)} fechado hoy: la sesión de este día ya cuenta y quedan 4.
+   493→                  {paquete?.activo ? " (Ya tiene un paquete activo — revisa antes de vender otro.)" : ""}
+   494→                </p>
+   495→              </div>
+   496→              <button
+   497→                type="button"
+   498→                role="switch"
+   499→                aria-checked={venderPaquete}
+   500→                onClick={() => setVenderPaquete(!venderPaquete)}
+   501→                className={cn(
+   502→                  "relative h-7 w-12 shrink-0 rounded-full transition-colors",
+   503→                  venderPaquete ? "bg-teal-500" : "bg-secondary border border-border"
+   504→                )}
+   505→              >
+   506→                <span
+   507→                  className={cn(
+   508→                    "absolute top-1 size-5 rounded-full bg-white transition-all",
+   509→                    venderPaquete ? "left-6" : "left-1"
+   510→                  )}
+   511→                />
+   512→              </button>
+   513→            </div>
+   514→
+   515→            {/* Desglose */}
+   516→            <div className="rounded-xl border border-border/70 bg-background/50 p-4">
+   517→              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Desglose</p>
+   518→              <ul className="num-tabular space-y-1 text-sm">
+   519→                <li className="flex justify-between"><span className="text-muted-foreground">Terapia ({tarifa === "otro" ? "monto libre" : tarifa} × {zonas} {zonas === 1 ? "zona" : "zonas"})</span><span>{soles(montoTerapia)}</span></li>
+   520→                {dicloCant > 0 && (
+   521→                  <li className="flex justify-between"><span className="text-muted-foreground">Diclofenaco × {dicloCant}</span><span>{soles(montoDiclo)}</span></li>
+   522→                )}
+   523→                {montoOrto > 0 && (
+   524→                  <li className="flex justify-between"><span className="text-muted-foreground">Ortopédico</span><span>{soles(montoOrto)}</span></li>
+   525→                )}
+   526→                {venderPaquete && (
+   527→                  <li className="flex justify-between"><span className="text-muted-foreground">Paquete de 5 sesiones</span><span>{soles(PAQUETE_PRECIO)}</span></li>
+   528→                )}
+   529→                <li className="flex justify-between border-t border-border/60 pt-2 text-base font-bold">
+   530→                  <span>Total {venderPaquete ? "(incluye paquete)" : ""}</span>
+   531→                  <span className="text-teal-300">{soles(totalConPaquete)}</span>
+   532→                </li>
+   533→              </ul>
+   534→            </div>
+   535→
+   536→            {/* Acciones */}
+   537→            <div className="flex flex-col gap-2 sm:flex-row">
+   538→              <Button
+   539→                variant="outline"
+   540→                className="flex-1 border-amber-500/40 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200"
+   541→                onClick={() => void guardar(false)}
+   542→                disabled={guardando || !!fechaMala}
+   543→              >
+   544→                {guardando ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Guardar visita (cobrar después)"}
+   545→              </Button>
+   546→              <Button className="flex-1 font-semibold" onClick={() => void guardar(true)} disabled={guardando || !!fechaMala}>
+   547→                <Wallet className="size-4" aria-hidden /> Guardar y cobrar ahora
+   548→              </Button>
+   549→            </div>
+   550→            <p className="text-center text-[11px] text-muted-foreground">
+   551→              Se creará el ingreso en Supabase y se actualizarán sus sesiones y resumen de asistencia.
+   552→            </p>
+   553→          </CardContent>
+   554→        </Card>
+   555→      )}
+   556→
+   557→      {!paciente && !query && (
+   558→        <Card className="border-dashed border-border/70 bg-card/40">
+   559→          <CardContent className="flex flex-col items-center gap-2 py-10 text-center">
+   560→            <Search className="size-8 text-muted-foreground/50" aria-hidden />
+   561→            <p className="text-sm text-muted-foreground">
+   562→              Empieza escribiendo el nombre del paciente para ver su ficha.
+   563→            </p>
+   564→          </CardContent>
+   565→        </Card>
+   566→      )}
+   567→
+   568→      {/* Modal de cobro */}
+   569→      <Dialog open={cobrando} onOpenChange={setCobrando}>
+   570→        <DialogContent className="border-border/70 bg-card">
+   571→          <DialogHeader>
+   572→            <DialogTitle>Cobrar {soles(totalConPaquete)}</DialogTitle>
+   573→            <DialogDescription>
+   574→              Elige el método de pago. Puedes usar métodos distintos para la terapia y los productos.
+   575→            </DialogDescription>
+   576→          </DialogHeader>
+   577→
+   578→          <div className="space-y-4">
+   579→            <div>
+   580→              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Método general</p>
+   581→              <div className="grid grid-cols-3 gap-2">
+   582→                {METODOS_PAGO.map((m) => (
+   583→                  <button
+   584→                    key={m}
+   585→                    type="button"
+   586→                    onClick={() => setMetodoGlobal(m)}
+   587→                    className={cn(
+   588→                      "min-h-11 rounded-lg border text-sm font-medium capitalize transition-colors",
+   589→                      metodoGlobal === m ? "border-teal-500/50 bg-teal-500/10 text-teal-200" : "border-border/70 hover:border-border"
+   590→                    )}
+   591→                  >
+   592→                    {m === "efectivo" ? "Efectivo" : m === "yape" ? "Yape" : "Tarjeta"}
+   593→                  </button>
+   594→                ))}
+   595→              </div>
+   596→            </div>
+   597→
+   598→            <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+   599→              {(montoTerapia > 0 || (venderPaquete && PAQUETE_PRECIO > 0)) && (
+   600→                <div className="flex items-center justify-between gap-2 text-sm">
+   601→                  <span className="text-muted-foreground">Terapia{venderPaquete ? " + paquete" : ""}</span>
+   602→                  <div className="flex items-center gap-2">
+   603→                    <span className="num-tabular font-semibold">{soles(montoTerapia + (venderPaquete ? PAQUETE_PRECIO : 0))}</span>
+   604→                    <Select
+   605→                      value={metodoLineas.terapia}
+   606→                      onValueChange={(v) => setMetodoLineas((ml) => ({ ...ml, terapia: v }))}
+   607→                    >
+   608→                      <SelectTrigger className="h-8 w-28 text-xs" aria-label="Método para terapia">
+   609→                        <SelectValue />
+   610→                      </SelectTrigger>
+   611→                      <SelectContent>
+   612→                        {METODOS_PAGO.map((m) => (
+   613→                          <SelectItem key={m} value={m} className="capitalize">
+   614→                            {m === "efectivo" ? "Efectivo" : m === "yape" ? "Yape" : "Tarjeta"}
+   615→                          </SelectItem>
+   616→                        ))}
+   617→                      </SelectContent>
+   618→                    </Select>
+   619→                  </div>
+   620→                </div>
+   621→              )}
+   622→              {(montoDiclo > 0 || montoOrto > 0) && (
+   623→                <div className="flex items-center justify-between gap-2 text-sm">
+   624→                  <span className="text-muted-foreground">Diclofenaco{montoOrto > 0 ? " + ortopédico" : ""}</span>
+   625→                  <div className="flex items-center gap-2">
+   626→                    <span className="num-tabular font-semibold">{soles(montoDiclo + montoOrto)}</span>
+   627→                    <Select
+   628→                      value={metodoLineas.extras}
+   629→                      onValueChange={(v) => setMetodoLineas((ml) => ({ ...ml, extras: v }))}
+   630→                    >
+   631→                      <SelectTrigger className="h-8 w-28 text-xs" aria-label="Método para productos">
+   632→                        <SelectValue />
+   633→                      </SelectTrigger>
+   634→                      <SelectContent>
+   635→                        {METODOS_PAGO.map((m) => (
+   636→                          <SelectItem key={m} value={m} className="capitalize">
+   637→                            {m === "efectivo" ? "Efectivo" : m === "yape" ? "Yape" : "Tarjeta"}
+   638→                          </SelectItem>
+   639→                        ))}
+   640→                      </SelectContent>
+   641→                    </Select>
+   642→                  </div>
+   643→                </div>
+   644→              )}
+   645→              <div className="flex justify-between border-t border-border/60 pt-2 text-sm font-bold">
+   646→                <span>Total a cobrar</span>
+   647→                <span className="num-tabular text-teal-300">{soles(totalConPaquete)}</span>
+   648→              </div>
+   649→            </div>
+   650→          </div>
+   651→
+   652→          <DialogFooter>
+   653→            <Button variant="ghost" onClick={() => setCobrando(false)} disabled={guardando}>Cancelar</Button>
+   654→            <Button onClick={() => void confirmarCobro()} disabled={guardando}>
+   655→              {guardando ? <Loader2 className="size-4 animate-spin" aria-hidden /> : `Confirmar cobro de ${soles(totalConPaquete)}`}
+   656→            </Button>
+   657→          </DialogFooter>
+   658→        </DialogContent>
+   659→      </Dialog>
+   660→    </div>
+   661→  );
+   662→}
+   663→
