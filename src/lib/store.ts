@@ -83,9 +83,9 @@ function traducirErrorDatos(msg: string): string {
   const m = msg.toLowerCase();
   if (m.includes("row-level security") || m.includes("rls"))
     return "Tu cuenta no tiene permiso sobre esta tabla. Verifica con el administrador del equipo.";
-  if (m.includes("duplicate key"))
-    return "Se produjo un conflicto de ID (otro registro se creó al mismo tiempo). Intenta de nuevo.";
   if (m.includes("duplicate key value")) return "Ese registro ya existe. Intenta de nuevo.";
+  if (m.includes("non-default value") || m.includes("identity column"))
+    return "La base de datos genera los IDs automáticamente; no se permiten IDs manuales en esa tabla.";
   if (m.includes("json") && m.includes("requested")) return "Error de formato en los datos enviados.";
   if (m.includes("jwt") || m.includes("token")) return "Tu sesión expiró. Vuelve a iniciar sesión.";
   return msg;
@@ -112,9 +112,28 @@ async function fetchAll<T>(tabla: string, orden: string, saneador: (r: Record<st
 }
 
 /**
- * Inserta una fila en tablas con PK bigint: primero prueba con id explícito
- * (max+1) para soportar columnas sin auto-generación; si la columna es
- * GENERATED ALWAYS o hay conflicto de duplicado, reintenta sin id o con otro id.
+ * Fusiona filas de asistencias en el caché local por id (actualiza las
+ * existentes y añade las nuevas, ordenadas por id).
+ */
+function fusionarAsistencias(actuales: Asistencia[], filas: Record<string, unknown>[]): Asistencia[] {
+  const map = new Map(actuales.map((a) => [a.id, a]));
+  for (const f of filas) {
+    const s = sanearAsistencia(f);
+    map.set(s.id, s);
+  }
+  return Array.from(map.values()).sort((a, b) => a.id - b.id);
+}
+
+/**
+ * Inserta una fila en tablas con PK bigint: primero prueba SIN id para que la
+ * BD lo genere (IDENTITY GENERATED ALWAYS/BY DEFAULT, secuencia o default).
+ *
+ * Un id explícito en una columna GENERATED ALWAYS AS IDENTITY es rechazado por
+ * Postgres con "cannot insert a non-DEFAULT value into column ..." (la palabra
+ * "GENERATED" solo aparece en el DETAIL, que Supabase no devuelve en el mensaje
+ * principal, por eso el reintento anterior no se activaba). Además, los ids
+ * manuales no avanzan la secuencia y acabarían colisionando: el id manual
+ * (max+1) queda solo como plan B para columnas sin auto-generación.
  */
 async function insertarFila(
   tabla: string,
@@ -125,21 +144,25 @@ async function insertarFila(
 ): Promise<{ data: Record<string, unknown> | null; error: string | null }> {
   const maxId = idsExistentes.length ? Math.max(...idsExistentes) : 0;
 
-  // Intento 1: id explícito
-  let res = await supabase.from(tabla).insert({ ...fila, [pk]: maxId + 1 }).select().single();
+  // Intento 1: sin id → lo genera la BD
+  let res = await supabase.from(tabla).insert(fila).select().single();
   if (!res.error) return { data: res.data as Record<string, unknown>, error: null };
 
   const msg = res.error.message.toLowerCase();
-  if (msg.includes("generated")) {
-    // La columna se autogenera: insertar sin id
-    res = await supabase.from(tabla).insert(fila).select().single();
+  const code = res.error.code ?? "";
+
+  // La PK exige valor explícito (columna sin auto-generación → NOT NULL sobre la PK)
+  if (code === "23502" || (msg.includes("null value in column") && msg.includes(pk))) {
+    // Intento 2: id manual max+1
+    res = await supabase.from(tabla).insert({ ...fila, [pk]: maxId + 1 }).select().single();
     if (!res.error) return { data: res.data as Record<string, unknown>, error: null };
-  } else if (msg.includes("duplicate")) {
-    // Conflicto de concurrencia: probar con ids aleatorios en un rango alto
-    for (let i = 0; i < 3; i++) {
-      const candidato = maxId + 1 + Math.floor(Math.random() * 5000) + 1;
-      res = await supabase.from(tabla).insert({ ...fila, [pk]: candidato }).select().single();
-      if (!res.error) return { data: res.data as Record<string, unknown>, error: null };
+    if (res.error.message.toLowerCase().includes("duplicate")) {
+      // Conflicto de concurrencia: probar con ids aleatorios en un rango alto
+      for (let i = 0; i < 3; i++) {
+        const candidato = maxId + 1 + Math.floor(Math.random() * 5000) + 1;
+        res = await supabase.from(tabla).insert({ ...fila, [pk]: candidato }).select().single();
+        if (!res.error) return { data: res.data as Record<string, unknown>, error: null };
+      }
     }
   }
   void saneador;
@@ -517,7 +540,9 @@ async function sincronizarResumen(
     });
   }
 
-  // 2. Asistencias (upsert manual)
+  // 2. Asistencias: actualizar por paciente_id — la fila puede haberla creado
+  //    ya el trigger de la BD al insertarse el ingreso, y su id puede faltar
+  //    en el caché local (con PK identity no se conoce de antemano).
   const fila = {
     paciente_id: pacienteId,
     ultima_asistencia: ultima,
@@ -528,18 +553,22 @@ async function sincronizarResumen(
     frec_semanal: frec,
     status,
   };
-  if (actual) {
-    const { data, error } = await supabase.from("asistencias").update(fila).eq("id", actual.id).select().single();
-    if (!error && data) {
-      const upd = sanearAsistencia(data as Record<string, unknown>);
-      set({ asistencias: get().asistencias.map((a) => (a.id === upd.id ? upd : a)) });
-    }
+  const updA = await supabase.from("asistencias").update(fila).eq("paciente_id", pacienteId).select();
+  const actualizadas = !updA.error && Array.isArray(updA.data) ? (updA.data as Record<string, unknown>[]) : [];
+  if (actualizadas.length > 0) {
+    set({ asistencias: fusionarAsistencias(get().asistencias, actualizadas) });
   } else {
+    // No existía: crearla (sin id explícito; si la PK lo exige, reintenta con id)
     const ids = get().asistencias.map((a) => a.id);
-    const { data, error } = await insertarFila("asistencias", "id", fila, ids, sanearAsistencia);
-    if (!error && data) {
-      const nueva = sanearAsistencia(data);
-      set({ asistencias: [...get().asistencias, nueva].sort((a, b) => a.id - b.id) });
+    const ins = await insertarFila("asistencias", "id", fila, ids, sanearAsistencia);
+    if (!ins.error && ins.data) {
+      set({ asistencias: fusionarAsistencias(get().asistencias, [ins.data]) });
+    } else {
+      // Carrera con el trigger de la BD (creó la fila entre medias): releerla
+      const sel = await supabase.from("asistencias").select().eq("paciente_id", pacienteId);
+      if (!sel.error && Array.isArray(sel.data) && sel.data.length > 0) {
+        set({ asistencias: fusionarAsistencias(get().asistencias, sel.data as Record<string, unknown>[]) });
+      }
     }
   }
 }
