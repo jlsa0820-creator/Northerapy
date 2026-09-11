@@ -30,13 +30,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -77,7 +70,6 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
   const [guardando, setGuardando] = useState(false);
   const [cobrando, setCobrando] = useState(false);
   const [metodoGlobal, setMetodoGlobal] = useState<EstadoLinea>("efectivo");
-  const [metodoLineas, setMetodoLineas] = useState({ terapia: "efectivo", extras: "efectivo" });
   const [exito, setExito] = useState<string | null>(null);
 
   const paciente = useMemo(
@@ -160,7 +152,6 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
       return;
     }
     if (cobrarAhora) {
-      setMetodoLineas({ terapia: metodoGlobal, extras: metodoGlobal });
       setCobrando(true);
       return;
     }
@@ -173,20 +164,21 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
   }
 
   async function confirmarCobro() {
+    // El método elegido se aplica a todas las líneas de la visita
     await persistir({
       terapia: {
-        estado: montoTerapia > 0 ? (metodoLineas.terapia as EstadoLinea) : "no_aplica",
+        estado: montoTerapia > 0 ? metodoGlobal : "no_aplica",
         monto: montoTerapia,
       },
       diclofenaco: {
-        estado: montoDiclo > 0 ? (metodoLineas.extras as EstadoLinea) : "no_aplica",
+        estado: montoDiclo > 0 ? metodoGlobal : "no_aplica",
         monto: montoDiclo,
       },
       ortopedico: {
-        estado: montoOrto > 0 ? (metodoLineas.extras as EstadoLinea) : "no_aplica",
+        estado: montoOrto > 0 ? metodoGlobal : "no_aplica",
         monto: montoOrto,
       },
-      paquete: venderPaquete ? (metodoLineas.terapia as EstadoLinea) : null,
+      paquete: venderPaquete ? metodoGlobal : null,
     });
     setCobrando(false);
   }
@@ -576,13 +568,13 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
           <DialogHeader>
             <DialogTitle>Cobrar {soles(totalConPaquete)}</DialogTitle>
             <DialogDescription>
-              Elige el método de pago. Puedes usar métodos distintos para la terapia y los productos.
+              Elige el método de pago: se aplicará a todas las líneas de esta visita.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Método general</p>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Método de pago</p>
               <div className="grid grid-cols-3 gap-2">
                 {METODOS_PAGO.map((m) => (
                   <button
@@ -604,47 +596,13 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
               {(montoTerapia > 0 || (venderPaquete && PAQUETE_PRECIO > 0)) && (
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <span className="text-muted-foreground">Terapia{venderPaquete ? " + paquete" : ""}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="num-tabular font-semibold">{soles(montoTerapia + (venderPaquete ? PAQUETE_PRECIO : 0))}</span>
-                    <Select
-                      value={metodoLineas.terapia}
-                      onValueChange={(v) => setMetodoLineas((ml) => ({ ...ml, terapia: v }))}
-                    >
-                      <SelectTrigger className="h-8 w-28 text-xs" aria-label="Método para terapia">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {METODOS_PAGO.map((m) => (
-                          <SelectItem key={m} value={m} className="capitalize">
-                            {m === "efectivo" ? "Efectivo" : m === "yape" ? "Yape" : "Tarjeta"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <span className="num-tabular font-semibold">{soles(montoTerapia + (venderPaquete ? PAQUETE_PRECIO : 0))}</span>
                 </div>
               )}
               {(montoDiclo > 0 || montoOrto > 0) && (
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <span className="text-muted-foreground">Diclofenaco{montoOrto > 0 ? " + ortopédico" : ""}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="num-tabular font-semibold">{soles(montoDiclo + montoOrto)}</span>
-                    <Select
-                      value={metodoLineas.extras}
-                      onValueChange={(v) => setMetodoLineas((ml) => ({ ...ml, extras: v }))}
-                    >
-                      <SelectTrigger className="h-8 w-28 text-xs" aria-label="Método para productos">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {METODOS_PAGO.map((m) => (
-                          <SelectItem key={m} value={m} className="capitalize">
-                            {m === "efectivo" ? "Efectivo" : m === "yape" ? "Yape" : "Tarjeta"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  <span className="num-tabular font-semibold">{soles(montoDiclo + montoOrto)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-border/60 pt-2 text-sm font-bold">
