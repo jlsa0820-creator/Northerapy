@@ -140,3 +140,51 @@
 .num-tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* ─── PWA / optimización móvil ─────────────────────────────────────────────
+ * Reglas fuera de @layer para poder ganar a las utilidades Tailwind.       */
+
+/* Sin destello azul/gris al tocar (Android/iOS) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS no debe re-escalar el texto al girar el celular */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Sin pull-to-refresh accidental mientras se desplazan listas largas */
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Respuesta táctil inmediata (elimina el retardo de doble toque)
+ * y sin selección de texto accidental en la interfaz */
+button,
+[role="button"],
+[role="switch"],
+[role="tab"],
+[role="option"],
+summary,
+a {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+nav,
+header {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS enfoca y hace zoom automático si el campo mide < 16px */
+@media (pointer: coarse) and (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

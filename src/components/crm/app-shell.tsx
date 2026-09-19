@@ -10,6 +10,7 @@ import { NuevoPacienteView } from "./nuevo-paciente-view";
 import { VisitaView } from "./visita-view";
 import { IngresosView } from "./ingresos-view";
 import { QuienDebeView } from "./quien-debe-view";
+import { BotonInstalar } from "@/components/pwa/boton-instalar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -61,7 +62,12 @@ export function CrmApp() {
     setRecoveryMode,
   } = useCrmStore();
 
-  const [vista, setVista] = useState<Vista>("dashboard");
+  // Vista inicial: la del atajo PWA (/?v=visita|nuevo|debe|…) si es válida
+  const [vista, setVista] = useState<Vista>(() => {
+    if (typeof window === "undefined") return "dashboard";
+    const v = new URLSearchParams(window.location.search).get("v") as Vista | null;
+    return v && NAV.some((n) => n.id === v) ? v : "dashboard";
+  });
   const [pacientePreselecc, setPacientePreselecc] = useState<number | null>(null);
   const [confirmarSalida, setConfirmarSalida] = useState(false);
 
@@ -116,7 +122,10 @@ export function CrmApp() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Cabecera */}
-      <header className="sticky top-0 z-40 border-b border-border/70 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/85">
+      <header
+        className="sticky top-0 z-40 border-b border-border/70 bg-sidebar/95 backdrop-blur supports-[backdrop-filter]:bg-sidebar/85"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-3 sm:px-5">
           <div className="flex items-center gap-2">
             <div className="flex size-8 items-center justify-center rounded-lg border border-teal-500/30 bg-teal-500/10">
@@ -131,6 +140,7 @@ export function CrmApp() {
                 ⚠ {loadError}
               </span>
             )}
+            <BotonInstalar />
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
