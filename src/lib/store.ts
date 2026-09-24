@@ -5,6 +5,8 @@ import { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import {
   Asistencia,
+  Episodio,
+  EpisodioEstado,
   EstadoLinea,
   Ingreso,
   Paciente,
@@ -63,6 +65,17 @@ function sanearIngreso(r: Record<string, unknown>): Ingreso {
   } as unknown as Ingreso;
 }
 
+function sanearEpisodio(r: Record<string, unknown>): Episodio {
+  return {
+    ...r,
+    id: Number(r.id),
+    paciente_id: Number(r.paciente_id),
+    fecha_inicio: String(r.fecha_inicio ?? "").slice(0, 10),
+    fecha_fin: r.fecha_fin ? String(r.fecha_fin).slice(0, 10) : null,
+    estado: (r.estado ?? "activo") as EpisodioEstado,
+  } as unknown as Episodio;
+}
+
 function traducirErrorAuth(msg: string): string {
   const m = msg.toLowerCase();
   if (m.includes("invalid login credentials")) return "Correo o contraseña incorrectos.";
@@ -83,7 +96,15 @@ function traducirErrorDatos(msg: string): string {
   const m = msg.toLowerCase();
   if (m.includes("row-level security") || m.includes("rls"))
     return "Tu cuenta no tiene permiso sobre esta tabla. Verifica con el administrador del equipo.";
-  if (m.includes("duplicate key value")) return "Ese registro ya existe. Intenta de nuevo.";
+  if (m.includes("duplicate key value")) {
+    if (m.includes("episodios_un_activo_por_paciente"))
+      return "Ese paciente ya tiene un episodio en tratamiento. Ciérralo antes de abrir otro.";
+    return "Ese registro ya existe. Intenta de nuevo.";
+  }
+  if (m.includes("episodios_rango_valido"))
+    return "La fecha de fin no puede ser anterior a la de inicio del episodio.";
+  if (m.includes("episodios_cierre_con_fecha"))
+    return "Un episodio cerrado necesita su fecha de fin.";
   if (m.includes("non-default value") || m.includes("identity column"))
     return "La base de datos genera los IDs automáticamente; no se permiten IDs manuales en esa tabla.";
   if (m.includes("json") && m.includes("requested")) return "Error de formato en los datos enviados.";
@@ -199,6 +220,14 @@ export interface EdicionIngreso {
   ortopedico_monto: number | null;
 }
 
+export interface EpisodioInput {
+  pacienteId: number;
+  diagnostico: string;
+  sistemaAfectado?: string | null;
+  fechaInicio: string;
+  notas?: string | null;
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 interface CrmState {
@@ -216,6 +245,7 @@ interface CrmState {
   pacientes: Paciente[];
   asistencias: Asistencia[];
   ingresos: Ingreso[];
+  episodios: Episodio[];
   dataReady: boolean;
   loadingData: boolean;
   loadError: string | null;
@@ -229,6 +259,9 @@ interface CrmState {
   registrarVisita: (input: VisitaInput) => Promise<Resultado>;
   actualizarIngreso: (id: number, cambios: EdicionIngreso) => Promise<Resultado>;
   eliminarIngreso: (id: number) => Promise<Resultado>;
+  crearEpisodio: (input: EpisodioInput) => Promise<Resultado>;
+  cerrarEpisodio: (id: number, estado: "completado" | "abandonado", fechaFin: string) => Promise<Resultado>;
+  reabrirEpisodio: (id: number) => Promise<Resultado>;
   cobrarLineas: (
     items: { ingresoId: number; linea: "terapia" | "diclofenaco" | "ortopedico"; metodo: EstadoLinea }[]
   ) => Promise<Resultado>;
@@ -241,6 +274,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
   pacientes: [],
   asistencias: [],
   ingresos: [],
+  episodios: [],
   dataReady: false,
   loadingData: false,
   loadError: null,
@@ -253,7 +287,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
 
   signOut: async () => {
     await supabase.auth.signOut();
-    set({ pacientes: [], asistencias: [], ingresos: [], dataReady: false, session: null });
+    set({ pacientes: [], asistencias: [], ingresos: [], episodios: [], dataReady: false, session: null });
   },
 
   enviarRecuperacion: async (email) => {
@@ -283,7 +317,7 @@ export const useCrmStore = create<CrmState>((set, get) => ({
         }
       }
       if (evento === "SIGNED_OUT") {
-        set({ pacientes: [], asistencias: [], ingresos: [], dataReady: false, session: null });
+        set({ pacientes: [], asistencias: [], ingresos: [], episodios: [], dataReady: false, session: null });
       }
     });
     // Marca auth lista tras la consulta inicial de sesión
@@ -299,12 +333,14 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     if (get().loadingData) return;
     set({ loadingData: true, loadError: null });
     try {
-      const [pacientes, asistencias, ingresos] = await Promise.all([
+      const [pacientes, asistencias, ingresos, episodios] = await Promise.all([
         fetchAll("pacientes", "paciente_id", sanearPaciente),
         fetchAll("asistencias", "id", sanearAsistencia),
         fetchAll("ingresos", "id", sanearIngreso),
+        // Historial médico: si la tabla aún no existiera, la app sigue funcionando
+        fetchAll("episodios", "id", sanearEpisodio).catch(() => [] as Episodio[]),
       ]);
-      set({ pacientes, asistencias, ingresos, dataReady: true });
+      set({ pacientes, asistencias, ingresos, episodios, dataReady: true });
     } catch (e) {
       set({
         loadError: e instanceof Error ? e.message : "Error desconocido al cargar los datos.",
@@ -355,6 +391,8 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     set({
       ingresos: get().ingresos.filter((i) => i.paciente_id !== id),
       asistencias: get().asistencias.filter((a) => a.paciente_id !== id),
+      // episodios se borra en cascada en la BD (FK on delete cascade)
+      episodios: get().episodios.filter((e) => e.paciente_id !== id),
       pacientes: get().pacientes.filter((p) => p.paciente_id !== id),
     });
     return { ok: true };
@@ -449,6 +487,56 @@ export const useCrmStore = create<CrmState>((set, get) => ({
     if (error) return { ok: false, error: traducirErrorDatos(error.message) };
     set({ ingresos: get().ingresos.filter((i) => i.id !== id) });
     await sincronizarResumen(prev.paciente_id, set, get, prev.zonas > 0 ? -1 : 0);
+    return { ok: true };
+  },
+
+  // ── Historial médico: episodios ─────────────────────────────────────────────
+
+  crearEpisodio: async (input) => {
+    const diagnostico = input.diagnostico.trim();
+    if (!diagnostico) return { ok: false, error: "Escribe el diagnóstico del episodio." };
+    const fila = {
+      paciente_id: input.pacienteId,
+      diagnostico,
+      sistema_afectado: input.sistemaAfectado?.trim() || null,
+      fecha_inicio: input.fechaInicio,
+      notas: input.notas?.trim() || null,
+    };
+    const ids = get().episodios.map((e) => e.id);
+    const { data, error } = await insertarFila("episodios", "id", fila, ids, sanearEpisodio);
+    if (error || !data) return { ok: false, error: error ?? "No se pudo crear el episodio." };
+    const nuevo = sanearEpisodio(data);
+    set({ episodios: [...get().episodios, nuevo].sort((a, b) => a.id - b.id) });
+    return { ok: true };
+  },
+
+  cerrarEpisodio: async (id, estado, fechaFin) => {
+    const prev = get().episodios.find((e) => e.id === id);
+    if (!prev) return { ok: false, error: "Episodio no encontrado." };
+    if (fechaFin < prev.fecha_inicio)
+      return { ok: false, error: "La fecha de fin no puede ser anterior a la de inicio." };
+    const { data, error } = await supabase
+      .from("episodios")
+      .update({ estado, fecha_fin: fechaFin })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error ? traducirErrorDatos(error.message) : "Sin respuesta." };
+    const actualizado = sanearEpisodio(data as Record<string, unknown>);
+    set({ episodios: get().episodios.map((e) => (e.id === id ? actualizado : e)) });
+    return { ok: true };
+  },
+
+  reabrirEpisodio: async (id) => {
+    const { data, error } = await supabase
+      .from("episodios")
+      .update({ estado: "activo", fecha_fin: null })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error || !data) return { ok: false, error: error ? traducirErrorDatos(error.message) : "Sin respuesta." };
+    const actualizado = sanearEpisodio(data as Record<string, unknown>);
+    set({ episodios: get().episodios.map((e) => (e.id === id ? actualizado : e)) });
     return { ok: true };
   },
 

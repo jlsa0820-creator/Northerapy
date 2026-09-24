@@ -47,7 +47,7 @@ echo "$SNAP" | grep -q '"Método para productos"' && echo "   ✓ Desplegable ju
 echo "$SNAP" | grep -q "se aplicará a todas las líneas" && echo "   ✗ Queda texto del método general" || echo "   ✓ Sin método general (texto)"
 echo "$SNAP" | grep -q "Método general" && echo "   ✗ Queda etiqueta «Método general»" || echo "   ✓ Sin etiqueta «Método general»"
 echo "$SNAP" | grep -q "Terapia" && echo "$SNAP" | grep -q "Diclofenaco" && echo "   ✓ Desglose visible (terapia + productos)" || echo "   ? Solo una línea en el desglose"
-echo "$SNAP" | grep -q "S/41.00" && echo "   ✓ Total correcto S/ 41 (35 terapia + 6 diclofenaco)" || echo "   ? Total no es S/ 41"
+echo "$SNAP" | grep -qE "S/.?41\.00" && echo "   ✓ Total correcto S/ 41 (35 terapia + 6 diclofenaco)" || echo "   ? Total no es S/ 41"
 DOMTXT=$($AB eval "document.querySelector('[role=dialog]').innerText" 2>/dev/null)
 echo "$DOMTXT" | grep -q "Total a cobrar" && echo "   ✓ Total a cobrar visible (DOM)" || echo "   ✗ FALTA total en el DOM"
 echo "$DOMTXT" | grep -q "métodos distintos para la terapia y los productos" && echo "   ✓ Descripción por línea presente (DOM)" || echo "   ✗ FALTA descripción por línea en el DOM"

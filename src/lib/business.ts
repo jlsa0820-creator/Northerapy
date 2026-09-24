@@ -1,5 +1,6 @@
 import {
   EstadoPaciente,
+  Episodio,
   Ingreso,
   METODOS_PAGO,
   PAQUETE_PRECIO,
@@ -311,4 +312,47 @@ export function iniciales(nombre: string): string {
 
 export function plural(n: number, sing: string, plur: string): string {
   return `${n} ${n === 1 ? sing : plur}`;
+}
+
+// ─── Historial médico (episodios) ────────────────────────────────────────────
+
+/**
+ * ¿La fila de ingresos es una sesión de terapia?
+ * Usa la columna `tipo` cuando existe (la rellena el trigger de la BD) y cae a
+ * la convención de la app (zonas > 0) para filas antiguas sin tipo.
+ */
+export function esSesion(i: Ingreso): boolean {
+  return i.tipo ? i.tipo === "sesion" : i.zonas > 0;
+}
+
+export interface ResumenEpisodio {
+  sesiones: number;
+  ultima: string | null;
+}
+
+/**
+ * Sesiones de un episodio: las filas de tipo 'sesion' cuya fecha cae dentro de
+ * la ventana [fecha_inicio, fecha_fin] (abierta si fecha_fin es null).
+ * Misma fórmula que la vista episodios_v de la base de datos.
+ */
+export function sesionesDeEpisodio(
+  ingresos: Ingreso[],
+  pacienteId: number,
+  episodio: Pick<Episodio, "fecha_inicio" | "fecha_fin">
+): ResumenEpisodio {
+  let sesiones = 0;
+  let ultima: string | null = null;
+  for (const i of ingresos) {
+    if (i.paciente_id !== pacienteId || !esSesion(i)) continue;
+    if (i.fecha < episodio.fecha_inicio) continue;
+    if (episodio.fecha_fin && i.fecha > episodio.fecha_fin) continue;
+    sesiones++;
+    if (!ultima || i.fecha > ultima) ultima = i.fecha;
+  }
+  return { sesiones, ultima };
+}
+
+/** El episodio en tratamiento del paciente, si lo hay (solo puede haber uno). */
+export function episodioActivoDe(episodios: Episodio[], pacienteId: number): Episodio | null {
+  return episodios.find((e) => e.paciente_id === pacienteId && e.estado === "activo") ?? null;
 }

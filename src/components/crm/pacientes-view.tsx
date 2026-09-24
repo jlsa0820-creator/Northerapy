@@ -16,6 +16,7 @@ import {
 } from "@/lib/business";
 import { Ingreso, OPCIONES_CONOCIO, Paciente, Vista } from "@/lib/types";
 import { StatusBadge, MetodoBadge } from "./badges";
+import { SeccionHistorial } from "./episodios";
 import { PacienteForm, type FormularioPaciente } from "./paciente-form";
 import { exportarPacientes } from "@/lib/excel";
 import { useToast } from "@/hooks/use-toast";
@@ -430,6 +431,8 @@ export function PacientesView({ irA }: Props) {
                       {detalle.sistema_afectado && <p className="text-sm text-muted-foreground">Sistema: {detalle.sistema_afectado}</p>}
                     </div>
                   )}
+
+                  <SeccionHistorial paciente={detalle} />
 
                   <div>
                     <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

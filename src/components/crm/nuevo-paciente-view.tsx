@@ -6,6 +6,7 @@ import { PacienteForm, type DatosGuardado } from "./paciente-form";
 import { useCrmStore } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 import { Vista } from "@/lib/types";
+import { hoyISO } from "@/lib/business";
 import { UserPlus } from "lucide-react";
 
 interface Props {
@@ -14,27 +15,47 @@ interface Props {
 
 export function NuevoPacienteView({ irA }: Props) {
   const crearPaciente = useCrmStore((s) => s.crearPaciente);
+  const crearEpisodio = useCrmStore((s) => s.crearEpisodio);
   const { toast } = useToast();
   const [guardando, setGuardando] = useState(false);
 
   async function guardar(datos: DatosGuardado): Promise<boolean> {
     setGuardando(true);
     const res = await crearPaciente(datos);
-    setGuardando(false);
-    if (res.ok) {
+    if (!res.ok) {
+      setGuardando(false);
       toast({
-        title: "Paciente creado ✓",
-        description: "Ya puedes anotar su primera visita y cobro.",
+        title: "No se pudo crear el paciente",
+        description: res.error,
+        variant: "destructive",
       });
-      irA("visita", res.id);
-      return true;
+      return false;
     }
+    // Primer episodio automático cuando la ficha ya trae diagnóstico:
+    // así su historial médico nace junto con el paciente.
+    let episodioTxt = "";
+    if (res.id && datos.diagnostico?.trim()) {
+      const ep = await crearEpisodio({
+        pacienteId: res.id,
+        diagnostico: datos.diagnostico,
+        sistemaAfectado: datos.sistema_afectado,
+        fechaInicio: datos.primera_sesion || hoyISO(),
+      });
+      episodioTxt = ep.ok ? ` Se abrió su primer episodio («${datos.diagnostico.trim()}»).` : "";
+      if (!ep.ok) {
+        toast({
+          title: "Episodio inicial no creado",
+          description: `${ep.error ?? ""} Puedes abrirlo desde su ficha en «Pacientes».`,
+        });
+      }
+    }
+    setGuardando(false);
     toast({
-      title: "No se pudo crear el paciente",
-      description: res.error,
-      variant: "destructive",
+      title: "Paciente creado ✓",
+      description: `Ya puedes anotar su primera visita y cobro.${episodioTxt}`,
     });
-    return false;
+    irA("visita", res.id);
+    return true;
   }
 
   return (

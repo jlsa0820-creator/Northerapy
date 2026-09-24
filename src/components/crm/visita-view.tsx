@@ -23,6 +23,7 @@ import {
   soles,
 } from "@/lib/business";
 import { StatusBadge } from "./badges";
+import { PanelEpisodioVisita } from "./episodios";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -356,6 +357,8 @@ export function VisitaView({ pacienteInicial, onPacienteUsado }: Props) {
                 Paquete de 5 sesiones activo: le quedan {paquete.restantes} (usadas {paquete.usadas} de 5, comprado el {fmtFecha(paquete.fechaCompra)}). La tarifa «Cubierta por paquete» quedó seleccionada.
               </p>
             )}
+
+            <PanelEpisodioVisita paciente={paciente} fechaSugerida={fecha} />
           </CardContent>
         </Card>
       )}

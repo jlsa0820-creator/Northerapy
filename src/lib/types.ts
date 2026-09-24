@@ -33,6 +33,28 @@ export interface Asistencia {
   status: string | null;
 }
 
+// ─── Historial médico (episodios) ────────────────────────────────────────────
+
+export type EpisodioEstado = "activo" | "completado" | "abandonado";
+
+export interface Episodio {
+  id: number;
+  paciente_id: number;
+  diagnostico: string;
+  sistema_afectado: string | null;
+  fecha_inicio: string; // 'YYYY-MM-DD'
+  fecha_fin: string | null; // null = episodio abierto
+  estado: EpisodioEstado;
+  notas: string | null;
+  created_at?: string | null;
+}
+
+export const ETIQUETA_EPISODIO: Record<EpisodioEstado, string> = {
+  activo: "En tratamiento",
+  completado: "Completado",
+  abandonado: "Abandonado",
+};
+
 export type EstadoLinea =
   | "efectivo"
   | "yape"
@@ -52,6 +74,7 @@ export interface Ingreso {
   ortopedico_estado: string | null;
   ortopedico_monto: number | null;
   total: number | null;
+  tipo?: string | null; // 'sesion' | 'compra_paquete' | 'venta_producto' (relleno por la BD)
 }
 
 // ─── Constantes de negocio ───────────────────────────────────────────────────
