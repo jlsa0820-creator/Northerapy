@@ -36,7 +36,7 @@ for i in 1 2 3 4 5 6; do
 done
 $AB wait 800 >/dev/null
 for i in 1 2 3 4 5 6; do
-  $AB eval "[...document.querySelectorAll('tr')].find(r => r.innerText.includes('Aladino Gordillo'))?.click()" >/dev/null 2>&1
+  $AB eval "[...document.querySelectorAll('tr')].find(r => r.innerText.includes('Paciente Ejemplo'))?.click()" >/dev/null 2>&1
   D1=$($AB eval "document.querySelector('[role=dialog]')?.innerText" 2>/dev/null)
   echo "$D1" | grep -qi "historial médico" && break
   $AB wait 700 >/dev/null
@@ -58,9 +58,9 @@ done
 $AB wait 600 >/dev/null
 
 echo "── 4. Seleccionar paciente → aviso ámbar «Sin episodio en tratamiento»"
-$AB find label "Buscar paciente por nombre" fill "Aladino" >/dev/null 2>&1 || true
+$AB find label "Buscar paciente por nombre" fill "Ejemplo" >/dev/null 2>&1 || true
 for i in 1 2 3 4 5 6; do
-  $AB find role button click --name "Aladino Gordillo ID 3" >/dev/null 2>&1 && break
+  $AB find role button click --name "Paciente Ejemplo ID 3" >/dev/null 2>&1 && break
   $AB wait 500 >/dev/null
 done
 $AB wait 900 >/dev/null
@@ -93,7 +93,7 @@ for i in 1 2 3 4; do
 done
 $AB wait 700 >/dev/null
 for i in 1 2 3 4 5; do
-  $AB eval "[...document.querySelectorAll('tr')].find(r => r.innerText.includes('Aladino Gordillo'))?.click()" >/dev/null 2>&1
+  $AB eval "[...document.querySelectorAll('tr')].find(r => r.innerText.includes('Paciente Ejemplo'))?.click()" >/dev/null 2>&1
   D5=$(dlg)
   echo "$D5" | grep -q "Cervicalgia" && break
   $AB wait 700 >/dev/null

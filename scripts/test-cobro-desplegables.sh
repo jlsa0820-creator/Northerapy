@@ -21,9 +21,9 @@ done
 $AB wait 600 >/dev/null
 
 echo "── 3. Seleccionar paciente"
-$AB find label "Buscar paciente por nombre" fill "Aladino" >/dev/null 2>&1 || true
+$AB find label "Buscar paciente por nombre" fill "Ejemplo" >/dev/null 2>&1 || true
 for i in 1 2 3 4 5 6; do
-  $AB find role button click --name "Aladino Gordillo ID 3" >/dev/null 2>&1 && break
+  $AB find role button click --name "Paciente Ejemplo ID 3" >/dev/null 2>&1 && break
   $AB wait 500 >/dev/null
 done
 $AB wait 700 >/dev/null

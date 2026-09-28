@@ -57,14 +57,14 @@ const diasAtras = (n) => { const d = new Date(hoy); d.setDate(d.getDate() - n); 
 // ── 2. Datos de prueba al estilo de las capturas ────────────────────────────
 // P1: sin ingresos, sin asistencias (recién creado)
 // P2: última asistencia hace 3 días laborales → debe quedar "En pausa"
-// P3: "Aladino": 51 sesiones históricas (legacy) pero solo 7 filas en ingresos → el 51 NO debe bajar
+// P3: "Ejemplo": 51 sesiones históricas (legacy) pero solo 7 filas en ingresos → el 51 NO debe bajar
 // P4: última asistencia hoy → "Activo"; con sesiones programadas 10 y 10 hechas → "Completó tratamiento"
 // P5: 65 años → grupo "Adultos mayores"
 await db.exec(`
 insert into pacientes values
  (1,'Paciente Nuevo', null, 30, 'años','Masculino','Abandonó', null, null, 0),
  (2,'Ana Reciente','Adultos: 30 a 59', 40, 'años','Femenino','Abandonó', ${`'${diasAtras(5)}'`}, null, 4),
- (3,'Aladino Gordillo','Adultos: 30 a 59', 57, 'años','Masculino','Abandonó', '${diasAtras(90)}', null, 51),
+ (3,'Paciente Ejemplo','Adultos: 30 a 59', 57, 'años','Masculino','Abandonó', '${diasAtras(90)}', null, 51),
  (4,'Bella Completo','Joven: 18 a 29', 25, 'años','Femenino','Abandonó', '${diasAtras(60)}', 10, 10),
  (5,'Carlos Mayor','Adultos: 30 a 59', 65, 'años','Masculino','Abandonó', '${diasAtras(100)}', null, 3)
 `);
@@ -76,7 +76,7 @@ insert into asistencias values
  (4, 4, '${diasAtras(2)}', null, 10, 0.0, 59, 0.3, 'Abandonó'),
  (5, 5, '${diasAtras(40)}', null, 3, 0.0, 87, 0.7, 'Abandonó')
 `);
-// Ingresos de "Aladino" (P3): 7 sesiones históricas + compra de paquete
+// Ingresos de "Ejemplo" (P3): 7 sesiones históricas + compra de paquete
 await db.exec(`
 insert into ingresos values
  (1, 3, '${diasAtras(45)}', 1, 'Efectivo', 30, 'No aplica', null, 'No aplica', null, 30),
@@ -117,7 +117,7 @@ for (const fila of r) {
   log(`status asistencias P${fila.paciente_id} = ${esperados[fila.paciente_id]}`, fila.status === esperados[fila.paciente_id], `obtuvo "${fila.status}"`);
 }
 
-// 4d. el histórico de Aladino (51) NO baja
+// 4d. el histórico de Ejemplo (51) NO baja
 r = await q(`select ses_totales from asistencias where paciente_id = 3`);
 log("histórico de sesiones conservado (P3: 51 ≥ 7 filas de ingresos)", Number(r[0].ses_totales) === 51, `ses_totales=${r[0].ses_totales}`);
 

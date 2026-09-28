@@ -69,7 +69,7 @@ await db.exec(`
 insert into pacientes values
  (1,'Paciente Nuevo', null, 30, 'años','Masculino', null, 'Abandonó', null, null, 0),
  (2,'Ana Reciente','Adultos: 30 a 59', 40, 'años','Femenino','987654321','Abandonó', ${`'${diasAtras(5)}'`}, null, 4),
- (3,'Aladino Gordillo','Adultos: 30 a 59', 57, 'años','Masculino','912345678','Abandonó', '${diasAtras(90)}', null, 51),
+ (3,'Paciente Ejemplo','Adultos: 30 a 59', 57, 'años','Masculino','912345678','Abandonó', '${diasAtras(90)}', null, 51),
  (4,'Bella Completo','Joven: 18 a 29', 25, 'años','Femenino','998877665','Abandonó', '${diasAtras(60)}', 10, 10),
  (5,'Carlos Mayor','Adultos: 30 a 59', 65, 'años','Masculino','955443322','Abandonó', '${diasAtras(100)}', null, 3)
 `);

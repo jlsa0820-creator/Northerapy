@@ -13,7 +13,7 @@ SESSION='{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDAwM
 $AB storage local set "sb-vmoomnoiburpbmrbspwb-auth-token" "$SESSION" >/dev/null
 
 echo "── 3. Simular datos de Supabase"
-$AB network route "**/rest/v1/pacientes*" --body '[{"paciente_id":3,"nombre_completo":"Aladino Gordillo","grupo_edad":"Adultos: 30 a 59","edad_valor":57,"edad_unidad":"años","sexo":"Masculino","celular_principal":"999888777","como_nos_conocio":"Referidos","diagnostico":"Lumbalgia","primera_sesion":"2026-01-12","sesiones_programadas":null,"sesiones_totales":51,"status":"Abandonó"}]' >/dev/null
+$AB network route "**/rest/v1/pacientes*" --body '[{"paciente_id":3,"nombre_completo":"Paciente Ejemplo","grupo_edad":"Adultos: 30 a 59","edad_valor":57,"edad_unidad":"años","sexo":"Masculino","celular_principal":"999888777","como_nos_conocio":"Referidos","diagnostico":"Lumbalgia","primera_sesion":"2026-01-12","sesiones_programadas":null,"sesiones_totales":51,"status":"Abandonó"}]' >/dev/null
 $AB network route "**/rest/v1/asistencias*" --body '[{"id":3,"paciente_id":3,"ultima_asistencia":"2026-06-11","ses_programadas":null,"ses_totales":51,"pct_adherencia":0,"dias_sin_asistir":61,"frec_semanal":1.6,"status":"Abandonó"}]' >/dev/null
 $AB network route "**/rest/v1/ingresos*" --body '[]' >/dev/null
 
@@ -27,9 +27,9 @@ $AB find role button click --name "Visita y cobro" >/dev/null || $AB find text "
 $AB wait 600 >/dev/null
 
 echo "── 6. Seleccionar paciente"
-$AB find label "Buscar paciente por nombre" fill "Aladino" >/dev/null 2>&1 || true
+$AB find label "Buscar paciente por nombre" fill "Ejemplo" >/dev/null 2>&1 || true
 $AB wait 500 >/dev/null
-$AB find text "Aladino Gordillo" click >/dev/null
+$AB find text "Paciente Ejemplo" click >/dev/null
 $AB wait 500 >/dev/null
 
 echo "── 7. Añadir diclofenaco (para ver 2 líneas en el desglose)"

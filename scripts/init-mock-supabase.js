@@ -31,7 +31,7 @@
     pacientes: [
       {
         paciente_id: 3,
-        nombre_completo: "Aladino Gordillo",
+        nombre_completo: "Paciente Ejemplo",
         grupo_edad: "Adultos: 30 a 59",
         edad_valor: 57,
         edad_unidad: "años",
