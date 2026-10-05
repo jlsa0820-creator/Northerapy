@@ -120,3 +120,4 @@ public/               # Iconos PWA, logo, service worker
   ./scripts/test-historial-ui.sh
   ./scripts/test-cobro-desplegables.sh
   ```
+Despliegue en Vercel
