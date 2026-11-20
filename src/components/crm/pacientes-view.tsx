@@ -259,8 +259,7 @@ export function PacientesView({ irA }: Props) {
                 <TableHead className="min-w-52">Paciente</TableHead>
                 <TableHead className="min-w-24">Edad</TableHead>
                 <TableHead className="min-w-32">Celular</TableHead>
-                <TableHead className="min-w-28 hidden md:table-cell">Origen</TableHead>
-                <TableHead className="min-w-40 hidden lg:table-cell">Diagnóstico</TableHead>
+                <TableHead className="min-w-40 hidden md:table-cell">Diagnóstico</TableHead>
                 <TableHead className="min-w-20">Paquete</TableHead>
                 <TableHead className="min-w-24">Sesiones</TableHead>
                 <TableHead className="min-w-36">Estado</TableHead>
@@ -271,7 +270,7 @@ export function PacientesView({ irA }: Props) {
             <TableBody>
               {visibles.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-32 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="h-32 text-center text-sm text-muted-foreground">
                     No hay pacientes con esos filtros.
                   </TableCell>
                 </TableRow>
@@ -303,8 +302,7 @@ export function PacientesView({ irA }: Props) {
                       <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="hidden text-muted-foreground md:table-cell">{p.como_nos_conocio ?? "—"}</TableCell>
-                  <TableCell className="hidden max-w-44 truncate text-muted-foreground lg:table-cell" title={p.diagnostico ?? ""}>
+                  <TableCell className="hidden max-w-44 truncate text-muted-foreground md:table-cell" title={p.diagnostico ?? ""}>
                     {p.diagnostico ?? "—"}
                   </TableCell>
                   <TableCell><PaqueteBadge cobra={p.cobra_paquete} /></TableCell>
