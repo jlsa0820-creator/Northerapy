@@ -44,3 +44,15 @@ export function estadoNormalizado(estado: string | null | undefined): EstadoPaci
   const conocidos: EstadoPaciente[] = ["Activo", "En pausa", "Abandonó", "Completó tratamiento", "Sin asistencias"];
   return conocidos.find((c) => c.toLowerCase() === estado.toLowerCase()) ?? estado;
 }
+
+/** Sí/No manual de «hay que cobrarle paquete»: el Sí resalta en ámbar, el No queda discreto. */
+export function PaqueteBadge({ cobra }: { cobra: boolean | null | undefined }) {
+  if (cobra) {
+    return (
+      <Badge variant="outline" className="whitespace-nowrap border-amber-500/30 bg-amber-500/15 font-semibold text-amber-300">
+        Sí
+      </Badge>
+    );
+  }
+  return <span className="text-muted-foreground">No</span>;
+}

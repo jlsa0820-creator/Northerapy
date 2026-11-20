@@ -31,6 +31,7 @@ export interface FormularioPaciente {
   referido_por: string;
   diagnostico: string;
   sistema_afectado: string;
+  cobra_paquete: boolean;
   primera_sesion: string;
   sesiones_programadas: string;
 }
@@ -49,6 +50,7 @@ export const FORM_VACIO: FormularioPaciente = {
   referido_por: "",
   diagnostico: "",
   sistema_afectado: "",
+  cobra_paquete: false,
   primera_sesion: hoyISO(),
   sesiones_programadas: "",
 };
@@ -67,6 +69,7 @@ export type DatosGuardado = {
   referido_por: string | null;
   diagnostico: string | null;
   sistema_afectado: string | null;
+  cobra_paquete: boolean;
   primera_sesion: string;
   sesiones_programadas: number | null;
 };
@@ -186,6 +189,7 @@ export function PacienteForm({ modo, inicial, onGuardar, onCancelar, guardando }
       referido_por: f.referido_por.trim() || null,
       diagnostico: f.diagnostico.trim() || null,
       sistema_afectado: f.sistema_afectado.trim() || null,
+      cobra_paquete: f.cobra_paquete,
       primera_sesion: f.primera_sesion,
       sesiones_programadas: f.sesiones_programadas === "" ? null : Number(f.sesiones_programadas),
     });
@@ -373,6 +377,42 @@ export function PacienteForm({ modo, inicial, onGuardar, onCancelar, guardando }
                 <option value="Pediátrico" />
                 <option value="Gerontológico" />
               </datalist>
+            </div>
+            <div className={cn(campo, "sm:col-span-2")}>
+              <Label>¿Hay que cobrarle paquete?</Label>
+              <div className="grid grid-cols-2 gap-2" role="group" aria-label="¿Hay que cobrarle paquete?">
+                <button
+                  type="button"
+                  aria-pressed={f.cobra_paquete === true}
+                  onClick={() => set("cobra_paquete", true)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2.5 transition-colors",
+                    f.cobra_paquete === true
+                      ? "border-amber-500/50 bg-amber-500/15"
+                      : "border-border/70 hover:border-border"
+                  )}
+                >
+                  <span className={cn("block text-sm font-semibold", f.cobra_paquete === true ? "text-amber-300" : "")}>Sí</span>
+                  <span className="block text-[11px] text-muted-foreground">Se le cobra por paquete</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={f.cobra_paquete === false}
+                  onClick={() => set("cobra_paquete", false)}
+                  className={cn(
+                    "rounded-lg border px-3 py-2.5 transition-colors",
+                    f.cobra_paquete === false
+                      ? "border-teal-500/50 bg-teal-500/10"
+                      : "border-border/70 hover:border-border"
+                  )}
+                >
+                  <span className={cn("block text-sm font-semibold", f.cobra_paquete === false ? "text-teal-200" : "")}>No</span>
+                  <span className="block text-[11px] text-muted-foreground">Solo sesión suelta</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Los paquetes son solo para pacientes con fractura: se elige manualmente al crear la ficha.
+              </p>
             </div>
             <div className={campo}>
               <Label htmlFor="primera">Primera sesión *</Label>

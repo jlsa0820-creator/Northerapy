@@ -36,6 +36,8 @@ function sanearPaciente(r: Record<string, unknown>): Paciente {
     edad_valor: num(r.edad_valor),
     sesiones_programadas: num(r.sesiones_programadas),
     sesiones_totales: Number(r.sesiones_totales ?? 0),
+    // La columna puede faltar si la migración de «cobro paquete» aún no se ejecutó
+    cobra_paquete: r.cobra_paquete === true,
   } as unknown as Paciente;
 }
 
@@ -354,7 +356,15 @@ export const useCrmStore = create<CrmState>((set, get) => ({
   crearPaciente: async (input) => {
     const fila: Record<string, unknown> = { ...input, sesiones_totales: 0, status: "Sin asistencias" };
     const ids = get().pacientes.map((p) => p.paciente_id);
-    const { data, error } = await insertarFila("pacientes", "paciente_id", fila, ids, sanearPaciente);
+    let r = await insertarFila("pacientes", "paciente_id", fila, ids, sanearPaciente);
+    // Tolerancia: si la BD aún no tiene la columna cobra_paquete (migración
+    // download/cobro_paquete_northerapy.sql pendiente), reintenta sin ese campo
+    // para no bloquear el alta de pacientes.
+    if (r.error?.includes("cobra_paquete")) {
+      const { cobra_paquete: _sinPaquete, ...filaSinPaquete } = fila;
+      r = await insertarFila("pacientes", "paciente_id", filaSinPaquete, ids, sanearPaciente);
+    }
+    const { data, error } = r;
     if (error || !data) return { ok: false, error: error ?? "No se pudo crear el paciente." };
     const nuevo = sanearPaciente(data);
     set({ pacientes: [...get().pacientes, nuevo].sort((a, b) => a.paciente_id - b.paciente_id) });
@@ -362,12 +372,23 @@ export const useCrmStore = create<CrmState>((set, get) => ({
   },
 
   actualizarPaciente: async (id, cambios) => {
-    const { data, error } = await supabase
+    let res = await supabase
       .from("pacientes")
       .update(cambios)
       .eq("paciente_id", id)
       .select()
       .single();
+    // Misma tolerancia que crearPaciente si la columna aún no existe en la BD
+    if (res.error?.message.includes("cobra_paquete") && cambios && typeof cambios === "object" && "cobra_paquete" in cambios) {
+      const { cobra_paquete: _sinPaquete, ...cambiosSinPaquete } = cambios;
+      res = await supabase
+        .from("pacientes")
+        .update(cambiosSinPaquete)
+        .eq("paciente_id", id)
+        .select()
+        .single();
+    }
+    const { data, error } = res;
     if (error || !data) return { ok: false, error: error ? traducirErrorDatos(error.message) : "Sin respuesta." };
     const actualizado = sanearPaciente(data as Record<string, unknown>);
     set({

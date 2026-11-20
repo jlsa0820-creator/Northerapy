@@ -14,8 +14,8 @@ import {
   soles,
   totalDeIngreso,
 } from "@/lib/business";
-import { Ingreso, OPCIONES_CONOCIO, Paciente, Vista } from "@/lib/types";
-import { StatusBadge, MetodoBadge } from "./badges";
+import { Ingreso, OPCIONES_CONOCIO, PAQUETE_SESIONES, Paciente, Vista } from "@/lib/types";
+import { StatusBadge, MetodoBadge, PaqueteBadge } from "./badges";
 import { SeccionHistorial } from "./episodios";
 import { PacienteForm, type FormularioPaciente } from "./paciente-form";
 import { exportarPacientes } from "@/lib/excel";
@@ -63,6 +63,7 @@ import {
   Download,
   FilePenLine,
   History,
+  Package,
   Pencil,
   Phone,
   Search,
@@ -146,6 +147,7 @@ export function PacientesView({ irA }: Props) {
       referido_por: p.referido_por ?? "",
       diagnostico: p.diagnostico ?? "",
       sistema_afectado: p.sistema_afectado ?? "",
+      cobra_paquete: p.cobra_paquete ?? false,
       primera_sesion: p.primera_sesion ?? "",
       sesiones_programadas: p.sesiones_programadas != null ? String(p.sesiones_programadas) : "",
     };
@@ -259,6 +261,7 @@ export function PacientesView({ irA }: Props) {
                 <TableHead className="min-w-32">Celular</TableHead>
                 <TableHead className="min-w-28 hidden md:table-cell">Origen</TableHead>
                 <TableHead className="min-w-40 hidden lg:table-cell">Diagnóstico</TableHead>
+                <TableHead className="min-w-20">Paquete</TableHead>
                 <TableHead className="min-w-24">Sesiones</TableHead>
                 <TableHead className="min-w-36">Estado</TableHead>
                 <TableHead className="min-w-24 text-right">Deuda</TableHead>
@@ -268,7 +271,7 @@ export function PacientesView({ irA }: Props) {
             <TableBody>
               {visibles.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-32 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={10} className="h-32 text-center text-sm text-muted-foreground">
                     No hay pacientes con esos filtros.
                   </TableCell>
                 </TableRow>
@@ -304,6 +307,7 @@ export function PacientesView({ irA }: Props) {
                   <TableCell className="hidden max-w-44 truncate text-muted-foreground lg:table-cell" title={p.diagnostico ?? ""}>
                     {p.diagnostico ?? "—"}
                   </TableCell>
+                  <TableCell><PaqueteBadge cobra={p.cobra_paquete} /></TableCell>
                   <TableCell className="num-tabular text-muted-foreground">
                     {p.sesiones_totales}
                     {p.sesiones_programadas ? ` / ${p.sesiones_programadas}` : ""}
@@ -424,13 +428,24 @@ export function PacientesView({ irA }: Props) {
                     </div>
                   </div>
 
-                  {(detalle.diagnostico || detalle.sistema_afectado) && (
-                    <div>
-                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Clínico</p>
-                      {detalle.diagnostico && <p className="text-sm">Diagnóstico: {detalle.diagnostico}</p>}
-                      {detalle.sistema_afectado && <p className="text-sm text-muted-foreground">Sistema: {detalle.sistema_afectado}</p>}
-                    </div>
-                  )}
+                  <div>
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Clínico</p>
+                    {detalle.diagnostico && <p className="text-sm">Diagnóstico: {detalle.diagnostico}</p>}
+                    {detalle.sistema_afectado && <p className="text-sm text-muted-foreground">Sistema: {detalle.sistema_afectado}</p>}
+                    {detalle.cobra_paquete ? (
+                      <div className="mt-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5" data-testid="cobrar-paquete-si">
+                        <p className="flex items-center gap-2 text-sm font-semibold text-amber-300">
+                          <Package className="size-4 shrink-0" aria-hidden /> Hay que cobrarle paquete
+                        </p>
+                        <p className="mt-0.5 text-xs text-amber-200/70">Se le cobra por paquete de {PAQUETE_SESIONES} sesiones.</p>
+                      </div>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/60 bg-secondary/30 px-3 py-2.5" data-testid="cobrar-paquete-no">
+                        <Package className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                        <p className="text-sm text-muted-foreground">No se le cobra paquete</p>
+                      </div>
+                    )}
+                  </div>
 
                   <SeccionHistorial paciente={detalle} />
 

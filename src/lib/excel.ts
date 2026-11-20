@@ -42,6 +42,7 @@ export function exportarPacientes(
       "Cómo nos conoció": p.como_nos_conocio ?? "",
       "Referido por": p.referido_por ?? "",
       "Diagnóstico": p.diagnostico ?? "",
+      "Paquete (cobrar)": p.cobra_paquete ? "Sí" : "No",
       "Sistema afectado": p.sistema_afectado ?? "",
       "Primera sesión": fmtFecha(p.primera_sesion),
       "Sesiones programadas": p.sesiones_programadas ?? "",

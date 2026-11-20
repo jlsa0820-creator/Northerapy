@@ -15,6 +15,7 @@ export interface Paciente {
   referido_por: string | null;
   diagnostico: string | null;
   sistema_afectado: string | null;
+  cobra_paquete: boolean | null; // ¿hay que cobrarle paquete? (sí/no manual, p. ej. fracturas)
   primera_sesion: string | null; // 'YYYY-MM-DD'
   sesiones_programadas: number | null;
   sesiones_totales: number;

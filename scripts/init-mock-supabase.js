@@ -40,6 +40,7 @@
         como_nos_conocio: "Referidos",
         diagnostico: "Lumbalgia",
         sistema_afectado: "Musculoesquelético",
+        cobra_paquete: false,
         primera_sesion: "2026-01-12",
         sesiones_programadas: null,
         sesiones_totales: 51,
@@ -149,6 +150,10 @@
         created_at: new Date().toISOString(),
         ...fila,
       };
+    }
+    if (tabla === "pacientes") {
+      // Default de la columna cobra_paquete (migración cobro_paquete_northerapy.sql)
+      return { cobra_paquete: false, ...fila };
     }
     if (tabla === "ingresos") {
       // Convención del trigger nor_ingresos_tipo

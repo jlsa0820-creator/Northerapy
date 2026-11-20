@@ -24,7 +24,10 @@ rápida, en español y optimizada para móvil. Instalable como app (PWA).
   cierre. Si un paciente regresa con un diagnóstico nuevo, se abre un nuevo
   episodio y el conteo de sesiones vuelve a empezar.
 - **➕ Nuevo paciente** — alta con datos demográficos, contacto, origen
-  (referido, posta, paciente antiguo…) y diagnóstico inicial.
+  (referido, posta, paciente antiguo…) y diagnóstico inicial. Incluye el campo
+  manual **«¿Hay que cobrarle paquete?» (Sí/No)** — pensado para los pacientes
+  con fractura — visible como columna en la lista de pacientes y resaltado en
+  la sección clínica de su ficha.
 - **💰 Dinero que entra** — ingresos por fecha con desglose por concepto y
   método de pago, y exportación a Excel.
 - **⚠️ Quién debe** — pacientes con pagos pendientes (“debe”) y totales por
